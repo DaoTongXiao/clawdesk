@@ -10,6 +10,7 @@ import { AppSidebar, SidebarMode } from "@/components/app-sidebar";
 import { ChatMessages } from "@/components/chat-messages";
 import { ChatInput } from "@/components/chat-input";
 import { ConnectionIndicator } from "@/components/connection-indicator";
+import { AppUpdateButton } from "@/components/app-update-button";
 import { OpenclawConfigPanel } from "@/components/openclaw-config-panel";
 import { OpenclawSectionId, getSectionLabel } from "@/components/openclaw-nav";
 import { useStore } from "@/lib/store";
@@ -92,6 +93,7 @@ export function ChatLayout() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <AppUpdateButton />
             {mode === "chat" && <ConnectionIndicator />}
           </div>
         </header>
