@@ -4,6 +4,7 @@ pub mod db;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::detect_gateway::detect_gateway,
             commands::chat_store::desktop_store_get_settings,

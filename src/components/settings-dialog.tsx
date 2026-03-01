@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useStore } from "@/lib/store";
 import { testConnection } from "@/lib/gateway";
+import {
+  AppUpdateState,
+  checkAndInstallAppUpdate,
+  getAppUpdateState,
+  subscribeAppUpdate,
+} from "@/lib/app-updater";
+import { isDesktopRuntime } from "@/lib/desktop";
 import { Loader2, CheckCircle2, XCircle, Settings } from "lucide-react";
 
 type TestState = "idle" | "testing" | "success" | "error";
@@ -15,6 +22,8 @@ export function GatewaySettingsPanel() {
   const [token, setToken] = useState("");
   const [testState, setTestState] = useState<TestState>("idle");
   const [testError, setTestError] = useState("");
+  const [updateState, setUpdateState] = useState<AppUpdateState>(getAppUpdateState());
+  const [manualUpdateLoading, setManualUpdateLoading] = useState(false);
   const autoConnectOnceRef = useRef(false);
 
   const gatewayUrl = url || state.settings?.gatewayUrl || state.detectedGatewayUrl || "";
@@ -41,6 +50,10 @@ export function GatewaySettingsPanel() {
     state.detectedToken,
   ]);
 
+  useEffect(() => {
+    return subscribeAppUpdate(setUpdateState);
+  }, []);
+
   const handleTest = async () => {
     if (!gatewayUrl || !gatewayToken) return;
     setTestState("testing");
@@ -57,6 +70,46 @@ export function GatewaySettingsPanel() {
   const handleSave = async () => {
     if (!gatewayUrl || !gatewayToken) return;
     await actions.saveAndConnect(gatewayUrl, gatewayToken);
+  };
+
+  const handleUpdate = async () => {
+    if (!isDesktopRuntime()) return;
+    setManualUpdateLoading(true);
+    try {
+      await checkAndInstallAppUpdate();
+    } finally {
+      setManualUpdateLoading(false);
+    }
+  };
+
+  const progressPercent =
+    (updateState.totalBytes ?? 0) > 0
+      ? Math.min(100, Math.floor(((updateState.downloadedBytes ?? 0) / (updateState.totalBytes ?? 1)) * 100))
+      : null;
+
+  const updateBusy =
+    manualUpdateLoading || updateState.stage === "checking" || updateState.stage === "downloading";
+
+  const updateStatusText = () => {
+    switch (updateState.stage) {
+      case "unsupported":
+        return "当前环境不支持自动更新";
+      case "checking":
+        return "正在检查更新";
+      case "latest":
+        return "已是最新版本";
+      case "available":
+        return updateState.version ? `发现新版本：${updateState.version}` : "发现新版本";
+      case "downloading":
+        return progressPercent === null ? "正在下载并安装更新" : `正在下载并安装更新（${progressPercent}%）`;
+      case "installed":
+        return "更新已安装，重启应用后生效";
+      case "error":
+        return updateState.errorMessage || "更新失败，请稍后重试";
+      case "idle":
+      default:
+        return "将自动检查并安装新版本";
+    }
   };
 
   return (
@@ -122,6 +175,24 @@ export function GatewaySettingsPanel() {
           </Button>
           <Button onClick={handleSave} disabled={!gatewayUrl || !gatewayToken}>
             保存并连接
+          </Button>
+        </div>
+      </div>
+      <div className="rounded-xl border border-border/70 bg-card p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <Settings className="size-4 text-muted-foreground" />
+          <h3 className="text-base font-semibold">应用更新</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">{updateStatusText()}</p>
+        {updateState.checkedAt && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            最近检查：{new Date(updateState.checkedAt).toLocaleTimeString()}
+          </p>
+        )}
+        <div className="mt-4 flex justify-end">
+          <Button variant="outline" onClick={handleUpdate} disabled={!isDesktopRuntime() || updateBusy}>
+            {updateBusy && <Loader2 className="mr-2 size-4 animate-spin" />}
+            检查并安装更新
           </Button>
         </div>
       </div>
