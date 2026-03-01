@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 
 export interface GatewayDetectionResult {
   found: boolean;
@@ -33,3 +34,12 @@ export async function detectGatewayFromDesktop(): Promise<GatewayDetectionResult
   }
 }
 
+export async function getDesktopAppVersion(): Promise<string | null> {
+  if (!isDesktopRuntime()) return null;
+
+  try {
+    return await getVersion();
+  } catch {
+    return null;
+  }
+}

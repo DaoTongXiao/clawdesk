@@ -22,6 +22,7 @@ import { OpenclawSectionId, getSectionLabel } from "@/components/openclaw-nav";
 import { buildCliSummary, isCliSection, OpenclawCliActions } from "@/components/openclaw/openclaw-cli-section";
 import { OpenclawSkillsSection } from "@/components/openclaw/openclaw-skills-section";
 import { GatewaySettingsPanel } from "@/components/settings-dialog";
+import { AboutPanel } from "@/components/about-panel";
 
 const sectionMap: Record<OpenclawSectionId, string | null> = {
   settings: null,
@@ -34,6 +35,7 @@ const sectionMap: Record<OpenclawSectionId, string | null> = {
   agents: "agents",
   skills: "skills",
   nodes: "nodes",
+  about: null,
   config: null,
   debug: null,
   logs: null,
@@ -63,7 +65,7 @@ export function OpenclawConfigPanel({ section }: { section: OpenclawSectionId })
 
   const sectionKey = sectionMap[section];
   const showRawEditor = section === "config" || section === "debug";
-  const isStandaloneSection = section === "settings";
+  const isStandaloneSection = section === "settings" || section === "about";
 
   const loadConfig = useCallback(async () => {
     try {
@@ -85,7 +87,7 @@ export function OpenclawConfigPanel({ section }: { section: OpenclawSectionId })
         setOverview(await readOpenclawOverview());
         return;
       }
-      if (section === "settings" || section === "skills") {
+      if (section === "settings" || section === "skills" || section === "about") {
         return;
       }
       if (section === "logs") {
@@ -213,6 +215,7 @@ export function OpenclawConfigPanel({ section }: { section: OpenclawSectionId })
     }
 
     if (section === "settings") return <GatewaySettingsPanel />;
+    if (section === "about") return <AboutPanel />;
     if (section === "skills") return <OpenclawSkillsSection />;
 
     if (isCliSection(section)) {
@@ -274,7 +277,11 @@ export function OpenclawConfigPanel({ section }: { section: OpenclawSectionId })
             <div>
               <h2 className="text-2xl font-semibold">{getSectionLabel(section)}</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {isStandaloneSection ? "在独立页面完成安全配置。" : "接管 openclaw 配置与运行信息。"}
+                {isStandaloneSection
+                  ? section === "about"
+                    ? "查看应用信息与版本。"
+                    : "在独立页面完成安全配置。"
+                  : "接管 openclaw 配置与运行信息。"}
               </p>
             </div>
             <div className="flex items-center gap-2">

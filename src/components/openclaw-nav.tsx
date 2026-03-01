@@ -8,6 +8,7 @@ import {
   CircleGauge,
   FileText,
   FolderOpen,
+  Info,
   LayoutDashboard,
   Logs,
   Radio,
@@ -37,6 +38,7 @@ export type OpenclawSectionId =
   | "agents"
   | "skills"
   | "nodes"
+  | "about"
   | "config"
   | "debug"
   | "logs";
@@ -55,7 +57,10 @@ interface NavGroup {
 const groups: NavGroup[] = [
   {
     title: "设置",
-    items: [{ id: "settings", label: "网关设置", icon: Settings }],
+    items: [
+      { id: "settings", label: "网关设置", icon: Settings },
+      { id: "about", label: "关于", icon: Info },
+    ],
   },
   {
     title: "控制",
