@@ -11,6 +11,13 @@ import {
   getAppUpdateState,
   subscribeAppUpdate,
 } from "@/lib/app-updater";
+import {
+  OpenclawUpdateState,
+  checkOpenclawUpdate,
+  getOpenclawUpdateState,
+  subscribeOpenclawUpdate,
+  updateOpenclaw,
+} from "@/lib/openclaw-updater";
 import { isDesktopRuntime } from "@/lib/desktop";
 import { Loader2, CheckCircle2, XCircle, Settings } from "lucide-react";
 
@@ -23,7 +30,9 @@ export function GatewaySettingsPanel() {
   const [testState, setTestState] = useState<TestState>("idle");
   const [testError, setTestError] = useState("");
   const [updateState, setUpdateState] = useState<AppUpdateState>(getAppUpdateState());
+  const [openclawUpdateState, setOpenclawUpdateState] = useState<OpenclawUpdateState>(getOpenclawUpdateState());
   const [manualUpdateLoading, setManualUpdateLoading] = useState(false);
+  const [openclawUpdating, setOpenclawUpdating] = useState(false);
   const autoConnectOnceRef = useRef(false);
 
   const gatewayUrl = url || state.settings?.gatewayUrl || state.detectedGatewayUrl || "";
@@ -54,6 +63,10 @@ export function GatewaySettingsPanel() {
     return subscribeAppUpdate(setUpdateState);
   }, []);
 
+  useEffect(() => {
+    return subscribeOpenclawUpdate(setOpenclawUpdateState);
+  }, []);
+
   const handleTest = async () => {
     if (!gatewayUrl || !gatewayToken) return;
     setTestState("testing");
@@ -79,6 +92,19 @@ export function GatewaySettingsPanel() {
       await checkAndInstallAppUpdate();
     } finally {
       setManualUpdateLoading(false);
+    }
+  };
+
+  const handleCheckOpenclawUpdate = async () => {
+    await checkOpenclawUpdate();
+  };
+
+  const handleUpdateOpenclaw = async () => {
+    setOpenclawUpdating(true);
+    try {
+      await updateOpenclaw();
+    } finally {
+      setOpenclawUpdating(false);
     }
   };
 
@@ -193,6 +219,74 @@ export function GatewaySettingsPanel() {
           <Button variant="outline" onClick={handleUpdate} disabled={!isDesktopRuntime() || updateBusy}>
             {updateBusy && <Loader2 className="mr-2 size-4 animate-spin" />}
             检查并安装更新
+          </Button>
+        </div>
+      </div>
+      <div className="rounded-xl border border-border/70 bg-card p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <Settings className="size-4 text-muted-foreground" />
+          <h3 className="text-base font-semibold">OpenClaw CLI 更新</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          当前版本: {openclawUpdateState.currentVersion || "未检测到"}
+        </p>
+        {openclawUpdateState.hasUpdate && (
+          <p className="mt-2 text-sm text-amber-500">
+            发现新版本: {openclawUpdateState.latestVersion}
+          </p>
+        )}
+        {openclawUpdateState.hasUpdate && (
+          <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+            <p className="text-xs text-amber-600">
+              检测到新版本，可以一键更新或访问 GitHub 下载
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={handleUpdateOpenclaw}
+                disabled={openclawUpdating || openclawUpdateState.stage === "updating"}
+              >
+                {(openclawUpdating || openclawUpdateState.stage === "updating") && (
+                  <Loader2 className="mr-1 size-3 animate-spin" />
+                )}
+                一键更新
+              </Button>
+              {openclawUpdateState.releaseUrl && (
+                <a
+                  href={openclawUpdateState.releaseUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-500 underline"
+                >
+                  前往 GitHub 下载
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+        {openclawUpdateState.stage === "updated" && (
+          <p className="mt-2 text-sm text-emerald-500">
+            更新完成，当前版本: {openclawUpdateState.currentVersion}
+          </p>
+        )}
+        {openclawUpdateState.stage === "error" && openclawUpdateState.error && (
+          <p className="mt-2 text-sm text-red-400">{openclawUpdateState.error}</p>
+        )}
+        {openclawUpdateState.checkedAt && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            最近检查：{new Date(openclawUpdateState.checkedAt).toLocaleTimeString()}
+          </p>
+        )}
+        <div className="mt-4 flex justify-end">
+          <Button
+            variant="outline"
+            onClick={handleCheckOpenclawUpdate}
+            disabled={!isDesktopRuntime() || openclawUpdateState.stage === "checking"}
+          >
+            {openclawUpdateState.stage === "checking" && (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            )}
+            检查更新
           </Button>
         </div>
       </div>

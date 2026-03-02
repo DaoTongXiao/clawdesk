@@ -35,10 +35,16 @@ fn parse_gateway_from_value(value: &Value) -> DetectGatewayResponse {
     };
 
     let port = gateway.get("port").and_then(Value::as_u64).unwrap_or(18789);
+    let host = gateway
+        .get("host")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .unwrap_or("localhost");
 
     DetectGatewayResponse {
         found: true,
-        url: Some(format!("ws://localhost:{port}")),
+        url: Some(format!("ws://{host}:{port}")),
         token: Some(token),
     }
 }
@@ -107,5 +113,15 @@ mod tests {
         assert!(!result.found);
         assert_eq!(result.url, None);
         assert_eq!(result.token, None);
+    }
+
+    #[test]
+    fn should_use_gateway_host_when_configured() {
+        let raw = r#"{"gateway":{"host":"192.168.0.191","port":20001,"auth":{"token":"abc"}}}"#;
+        let result = parse_gateway_from_raw(raw);
+
+        assert!(result.found);
+        assert_eq!(result.url, Some("ws://192.168.0.191:20001".to_string()));
+        assert_eq!(result.token, Some("abc".to_string()));
     }
 }

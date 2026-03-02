@@ -63,6 +63,7 @@ fn query_args(section: &str) -> Option<Vec<String>> {
         "agents" => vec!["agents", "list", "--json", "--bindings"],
         "skills" => vec!["skills", "list", "--json", "--verbose"],
         "nodes" => vec!["nodes", "list", "--json"],
+        "version" => vec!["--version"],
         _ => return None,
     };
     Some(args.iter().map(|v| v.to_string()).collect())
@@ -92,6 +93,7 @@ fn action_args(
     dry_run: bool,
 ) -> Result<Vec<String>, String> {
     let args = match (section, action) {
+        ("selfUpdate", "update") => vec!["update".to_string()],
         ("sessions", "cleanup") => {
             if dry_run {
                 vec![
@@ -159,6 +161,11 @@ fn action_args(
 pub fn openclaw_cli_query(section: String) -> Result<OpenclawCliPayload, String> {
     let args = query_args(section.as_str()).ok_or_else(|| "unsupported section".to_string())?;
     run_openclaw(section.as_str(), args.as_slice())
+}
+
+#[tauri::command]
+pub fn openclaw_cli_version() -> Result<OpenclawCliPayload, String> {
+    run_openclaw("version", &["--version".to_string()])
 }
 
 #[tauri::command]

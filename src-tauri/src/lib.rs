@@ -21,6 +21,7 @@ pub fn run() {
             commands::chat_store::desktop_store_search_conversations,
             commands::openclaw_cli::openclaw_cli_query,
             commands::openclaw_cli::openclaw_cli_action,
+            commands::openclaw_cli::openclaw_cli_version,
             commands::openclaw_config::openclaw_config_read,
             commands::openclaw_config::openclaw_config_save,
             commands::openclaw_runtime::openclaw_overview_read,

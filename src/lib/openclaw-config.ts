@@ -138,3 +138,19 @@ export async function runOpenclawAction(
   }
   return invoke<OpenclawCliPayload>("openclaw_cli_action", { section, action, target, dryRun });
 }
+
+export async function getOpenclawCliVersion(): Promise<string | null> {
+  if (!isDesktopRuntime()) return null;
+
+  try {
+    const payload = await invoke<OpenclawCliPayload>("openclaw_cli_version");
+    if (!payload.ok) return null;
+
+    // Parse version from output, format might be "openclaw 0.1.0" or "0.1.0"
+    const output = payload.stderr || String(payload.data || "");
+    const match = output.match(/(\d+\.\d+\.\d+)/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
