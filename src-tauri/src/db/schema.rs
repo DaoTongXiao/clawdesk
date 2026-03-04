@@ -72,6 +72,31 @@ fn initialize_schema(conn: &Connection) -> Result<(), String> {
           ON conversations(updated_at DESC);
         CREATE INDEX IF NOT EXISTS idx_messages_conversation_id_created_at
           ON messages(conversation_id, created_at);
+        -- FTS5 virtual table for message content search
+        CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+          id UNINDEXED,
+          conversation_id UNINDEXED,
+          role UNINDEXED,
+          content,
+          created_at UNINDEXED,
+          content='messages',
+          content_rowid='rowid'
+        );
+        -- Triggers to keep FTS5 index in sync
+        CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
+          INSERT INTO messages_fts(rowid, id, conversation_id, role, content, created_at)
+          VALUES (new.rowid, new.id, new.conversation_id, new.role, new.content, new.created_at);
+        END;
+        CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN
+          INSERT INTO messages_fts(messages_fts, rowid, id, conversation_id, role, content, created_at)
+          VALUES ('delete', old.rowid, old.id, old.conversation_id, old.role, old.content, old.created_at);
+        END;
+        CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
+          INSERT INTO messages_fts(messages_fts, rowid, id, conversation_id, role, content, created_at)
+          VALUES ('delete', old.rowid, old.id, old.conversation_id, old.role, old.content, old.created_at);
+          INSERT INTO messages_fts(rowid, id, conversation_id, role, content, created_at)
+          VALUES (new.rowid, new.id, new.conversation_id, new.role, new.content, new.created_at);
+        END;
         ",
     )
     .map_err(|err| format!("initialize schema failed: {err}"))?;

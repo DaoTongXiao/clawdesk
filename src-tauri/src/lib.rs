@@ -19,6 +19,7 @@ pub fn run() {
             commands::chat_store::desktop_store_get_messages,
             commands::chat_store::desktop_store_add_message,
             commands::chat_store::desktop_store_search_conversations,
+            commands::chat_store::desktop_store_search_messages,
             commands::openclaw_cli::openclaw_cli_query,
             commands::openclaw_cli::openclaw_cli_action,
             commands::openclaw_cli::openclaw_cli_version,

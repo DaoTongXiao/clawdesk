@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isDesktopRuntime } from "@/lib/desktop";
+import { querySectionByGateway } from "@/lib/openclaw-config-gateway";
+export { isRemoteGatewayUrl } from "@/lib/openclaw-config-gateway";
 
 export interface OpenclawConfigSection {
   key: string;
@@ -59,6 +61,22 @@ const defaultPayload: OpenclawConfigPayload = {
   config: {},
   sections: [],
 };
+
+function toErrorText(error: unknown): string {
+  return error instanceof Error ? error.message : "命令执行失败";
+}
+
+function toPayloadError(section: string, message: string, command: string[] = []): OpenclawCliPayload {
+  return {
+    section,
+    command,
+    ok: false,
+    statusCode: -1,
+    data: null,
+    stderr: message,
+  };
+}
+
 
 export async function readOpenclawConfig(): Promise<OpenclawConfigPayload> {
   if (!isDesktopRuntime()) {
@@ -120,11 +138,29 @@ export async function validateOpenclawConfig(raw: string): Promise<OpenclawValid
   return invoke<OpenclawValidatePayload>("openclaw_config_validate", { raw });
 }
 
-export async function queryOpenclawSection(section: string): Promise<OpenclawCliPayload> {
+export async function queryOpenclawSection(
+  section: string,
+  options?: { fallbackToLocal?: boolean }
+): Promise<OpenclawCliPayload> {
   if (!isDesktopRuntime()) {
-    return { section, command: [], ok: false, statusCode: -1, data: null, stderr: "desktop runtime required" };
+    return toPayloadError(section, "desktop runtime required");
   }
-  return invoke<OpenclawCliPayload>("openclaw_cli_query", { section });
+
+  const fallbackToLocal = options?.fallbackToLocal !== false;
+  const gatewayPayload = await querySectionByGateway(section);
+  if (gatewayPayload && (gatewayPayload.ok || !fallbackToLocal)) {
+    return gatewayPayload;
+  }
+
+  if (!fallbackToLocal) {
+    return gatewayPayload ?? toPayloadError(section, "网关未连接");
+  }
+
+  try {
+    return await invoke<OpenclawCliPayload>("openclaw_cli_query", { section });
+  } catch (error) {
+    return gatewayPayload ?? toPayloadError(section, toErrorText(error));
+  }
 }
 
 export async function runOpenclawAction(
@@ -134,9 +170,18 @@ export async function runOpenclawAction(
   dryRun?: boolean
 ): Promise<OpenclawCliPayload> {
   if (!isDesktopRuntime()) {
-    return { section, command: [], ok: false, statusCode: -1, data: null, stderr: "desktop runtime required" };
+    return toPayloadError(section, "desktop runtime required");
   }
-  return invoke<OpenclawCliPayload>("openclaw_cli_action", { section, action, target, dryRun });
+  try {
+    return await invoke<OpenclawCliPayload>("openclaw_cli_action", {
+      section,
+      action,
+      target,
+      dry_run: dryRun,
+    });
+  } catch (error) {
+    return toPayloadError(section, toErrorText(error));
+  }
 }
 
 export async function getOpenclawCliVersion(): Promise<string | null> {

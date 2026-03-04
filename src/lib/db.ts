@@ -10,6 +10,7 @@ import {
   desktopGetSettings,
   desktopSaveSettings,
   desktopSearchConversations,
+  desktopSearchMessages,
   desktopUpdateConversationTitle,
   desktopUpdateTheme,
 } from "@/lib/desktop-db";
@@ -156,4 +157,25 @@ export async function searchConversations(query: string): Promise<Conversation[]
   const lower = query.toLowerCase();
   const all = await getAllConversations();
   return all.filter((c) => c.title.toLowerCase().includes(lower));
+}
+
+export async function searchMessages(
+  query: string,
+  conversationId?: string
+): Promise<Message[]> {
+  if (isDesktopStore()) {
+    return desktopSearchMessages(query, conversationId);
+  }
+  // For web (IndexedDB), use case-insensitive content search
+  const lower = query.toLowerCase();
+  let messages: Message[];
+  if (conversationId) {
+    messages = await db.messages.where("conversationId").equals(conversationId).toArray();
+  } else {
+    messages = await db.messages.toArray();
+  }
+  return messages
+    .filter((m) => m.content.toLowerCase().includes(lower))
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 100);
 }

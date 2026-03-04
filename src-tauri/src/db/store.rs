@@ -313,3 +313,63 @@ pub fn search_conversations(
             .map_err(|err| format!("collect search result failed: {err}"))
     })
 }
+
+pub fn search_messages(
+    app: &AppHandle,
+    query: &str,
+    conversation_id: Option<&str>,
+) -> Result<Vec<MessageRecord>, String> {
+    ensure_not_empty(query, "query")?;
+    let search_query = query.to_lowercase();
+    with_conn_by_path(db_path(app)?.as_path(), |conn| {
+        if let Some(cid) = conversation_id {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT m.id, m.conversation_id, m.role, m.content, m.created_at
+                     FROM messages m
+                     JOIN messages_fts fts ON m.rowid = fts.rowid
+                     WHERE messages_fts MATCH ?1 AND m.conversation_id = ?2
+                     ORDER BY m.created_at DESC
+                     LIMIT 100",
+                )
+                .map_err(|err| format!("prepare search messages failed: {err}"))?;
+            let rows = stmt
+                .query_map(params![search_query, cid], |row| {
+                    Ok(MessageRecord {
+                        id: row.get(0)?,
+                        conversation_id: row.get(1)?,
+                        role: row.get(2)?,
+                        content: row.get(3)?,
+                        created_at: row.get(4)?,
+                    })
+                })
+                .map_err(|err| format!("query search messages failed: {err}"))?;
+            rows.collect::<Result<Vec<_>, _>>()
+                .map_err(|err| format!("collect search messages result failed: {err}"))
+        } else {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT m.id, m.conversation_id, m.role, m.content, m.created_at
+                     FROM messages m
+                     JOIN messages_fts fts ON m.rowid = fts.rowid
+                     WHERE messages_fts MATCH ?1
+                     ORDER BY m.created_at DESC
+                     LIMIT 100",
+                )
+                .map_err(|err| format!("prepare search messages failed: {err}"))?;
+            let rows = stmt
+                .query_map(params![search_query], |row| {
+                    Ok(MessageRecord {
+                        id: row.get(0)?,
+                        conversation_id: row.get(1)?,
+                        role: row.get(2)?,
+                        content: row.get(3)?,
+                        created_at: row.get(4)?,
+                    })
+                })
+                .map_err(|err| format!("query search messages failed: {err}"))?;
+            rows.collect::<Result<Vec<_>, _>>()
+                .map_err(|err| format!("collect search messages result failed: {err}"))
+        }
+    })
+}

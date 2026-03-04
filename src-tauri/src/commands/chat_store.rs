@@ -86,3 +86,12 @@ pub fn desktop_store_search_conversations(
 ) -> Result<Vec<ConversationRecord>, String> {
     store::search_conversations(&app, query.as_str())
 }
+
+#[tauri::command]
+pub fn desktop_store_search_messages(
+    app: AppHandle,
+    query: String,
+    conversation_id: Option<String>,
+) -> Result<Vec<MessageRecord>, String> {
+    store::search_messages(&app, query.as_str(), conversation_id.as_deref())
+}

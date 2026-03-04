@@ -17,7 +17,7 @@ export async function desktopSaveSettings(
   theme: "dark" | "light"
 ): Promise<Settings> {
   const result = await invoke<Settings>("desktop_store_save_settings", {
-    gatewayUrl,
+    gateway_url: gatewayUrl,
     token,
     theme,
   });
@@ -46,7 +46,7 @@ export async function desktopCreateConversation(
 ): Promise<Conversation> {
   return invoke<Conversation>("desktop_store_create_conversation", {
     id,
-    sessionKey,
+    session_key: sessionKey,
     title,
   });
 }
@@ -67,7 +67,7 @@ export async function desktopDeleteAllConversations(): Promise<void> {
 }
 
 export async function desktopGetMessages(conversationId: string): Promise<Message[]> {
-  return invoke<Message[]>("desktop_store_get_messages", { conversationId });
+  return invoke<Message[]>("desktop_store_get_messages", { conversation_id: conversationId });
 }
 
 export async function desktopAddMessage(message: Message): Promise<void> {
@@ -76,5 +76,15 @@ export async function desktopAddMessage(message: Message): Promise<void> {
 
 export async function desktopSearchConversations(query: string): Promise<Conversation[]> {
   return invoke<Conversation[]>("desktop_store_search_conversations", { query });
+}
+
+export async function desktopSearchMessages(
+  query: string,
+  conversationId?: string
+): Promise<Message[]> {
+  return invoke<Message[]>("desktop_store_search_messages", {
+    query,
+    conversation_id: conversationId ?? null,
+  });
 }
 

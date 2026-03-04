@@ -1,5 +1,4 @@
 "use client";
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +8,7 @@ import {
   OpenclawOverviewPayload,
   OpenclawSectionPayload,
   OpenclawValidatePayload,
+  isRemoteGatewayUrl,
   queryOpenclawSection,
   readOpenclawConfig,
   readOpenclawLogs,
@@ -23,6 +23,7 @@ import { buildCliSummary, isCliSection, OpenclawCliActions } from "@/components/
 import { OpenclawSkillsSection } from "@/components/openclaw/openclaw-skills-section";
 import { GatewaySettingsPanel } from "@/components/settings-dialog";
 import { AboutPanel } from "@/components/about-panel";
+import { useStore } from "@/lib/store";
 
 const sectionMap: Record<OpenclawSectionId, string | null> = {
   settings: null,
@@ -50,6 +51,7 @@ function toPretty(value: unknown): string {
 }
 
 export function OpenclawConfigPanel({ section }: { section: OpenclawSectionId }) {
+  const { state } = useStore();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -66,16 +68,23 @@ export function OpenclawConfigPanel({ section }: { section: OpenclawSectionId })
   const sectionKey = sectionMap[section];
   const showRawEditor = section === "config" || section === "debug";
   const isStandaloneSection = section === "settings" || section === "about";
+  const activeGatewayUrl = state.settings?.gatewayUrl || state.detectedGatewayUrl || "";
+  const activeGatewayToken = state.settings?.token || state.detectedToken || "";
+  const useRemoteHostConfig = isRemoteGatewayUrl(activeGatewayUrl);
 
   const loadConfig = useCallback(async () => {
     try {
+      if (useRemoteHostConfig) {
+        setPath(`远程主机：${activeGatewayUrl}`);
+        return;
+      }
       const result = await readOpenclawConfig();
       setPath(result.path || "~/.openclaw/openclaw.json");
       setEditor(result.raw || "{}");
     } catch (err) {
       setError(err instanceof Error ? err.message : "读取配置失败");
     }
-  }, []);
+  }, [activeGatewayUrl, useRemoteHostConfig]);
 
   const loadSection = useCallback(async () => {
     setLoading(true);
@@ -84,6 +93,10 @@ export function OpenclawConfigPanel({ section }: { section: OpenclawSectionId })
     setCliData(null);
     try {
       if (section === "overview") {
+        if (useRemoteHostConfig) {
+          setOverview({ found: Boolean(activeGatewayUrl), path: `远程主机：${activeGatewayUrl}`, sectionCount: 0, hasGateway: Boolean(activeGatewayUrl), hasGatewayToken: Boolean(activeGatewayToken.trim()), gatewayPort: null, sectionKeys: [] });
+          return;
+        }
         setOverview(await readOpenclawOverview());
         return;
       }
@@ -99,9 +112,9 @@ export function OpenclawConfigPanel({ section }: { section: OpenclawSectionId })
         return;
       }
       if (isCliSection(section)) {
-        const payload = await queryOpenclawSection(section);
+        const payload = await queryOpenclawSection(section, { fallbackToLocal: !useRemoteHostConfig });
         setCliData(payload);
-        if (!payload.ok && sectionKey) {
+        if (!payload.ok && sectionKey && !useRemoteHostConfig) {
           setSectionData(await readOpenclawSection(sectionKey));
         }
         return;
@@ -114,7 +127,7 @@ export function OpenclawConfigPanel({ section }: { section: OpenclawSectionId })
     } finally {
       setLoading(false);
     }
-  }, [editor, logsKeyword, section, sectionKey]);
+  }, [activeGatewayToken, activeGatewayUrl, editor, logsKeyword, section, sectionKey, useRemoteHostConfig]);
 
   useEffect(() => {
     setError("");
@@ -160,9 +173,10 @@ export function OpenclawConfigPanel({ section }: { section: OpenclawSectionId })
 
   const sectionBody = () => {
     if (section === "overview") {
+      const overviewPath = useRemoteHostConfig ? path || `远程主机：${activeGatewayUrl}` : overview?.path || path || "~/.openclaw/openclaw.json";
       return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Card title="配置文件">{overview?.path || path || "~/.openclaw/openclaw.json"}</Card>
+          <Card title="配置文件">{overviewPath}</Card>
           <Card title="分区数量">{String(overview?.sectionCount ?? 0)}</Card>
           <Card title="网关配置">{overview?.hasGateway ? "已配置" : "未配置"}</Card>
           <Card title="鉴权令牌">{overview?.hasGatewayToken ? "已配置" : "未配置"}</Card>

@@ -13,6 +13,7 @@ import { ConnectionIndicator } from "@/components/connection-indicator";
 import { AppUpdateButton } from "@/components/app-update-button";
 import { OpenclawConfigPanel } from "@/components/openclaw-config-panel";
 import { OpenclawSectionId, getSectionLabel } from "@/components/openclaw-nav";
+import { SearchDialog } from "@/components/search-dialog";
 import { useStore } from "@/lib/store";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Pencil } from "lucide-react";
+import { Pencil, Search } from "lucide-react";
 
 export function ChatLayout() {
   const { state, actions } = useStore();
@@ -46,6 +47,10 @@ export function ChatLayout() {
   const [renameValue, setRenameValue] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
 
+  // Search dialog state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchScope, setSearchScope] = useState<"global" | "current">("global");
+
   const openRename = () => {
     if (!activeConv) return;
     setRenameValue(activeConv.title);
@@ -58,6 +63,23 @@ export function ChatLayout() {
     }
     setRenameOpen(false);
   };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + F: Open search
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        e.preventDefault();
+        if (mode === "chat") {
+          setSearchScope(state.activeConversationId ? "current" : "global");
+          setSearchOpen(true);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [mode, state.activeConversationId]);
 
   useEffect(() => {
     if (renameOpen) {
@@ -93,6 +115,19 @@ export function ChatLayout() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {mode === "chat" && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => {
+                  setSearchScope(state.activeConversationId ? "current" : "global");
+                  setSearchOpen(true);
+                }}
+                title="搜索消息 (Ctrl+F)"
+              >
+                <Search className="size-4" />
+              </Button>
+            )}
             <AppUpdateButton />
             {mode === "chat" && <ConnectionIndicator />}
           </div>
@@ -141,6 +176,13 @@ export function ChatLayout() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Search Dialog */}
+      <SearchDialog
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        initialScope={searchScope}
+      />
     </SidebarProvider>
   );
 }
