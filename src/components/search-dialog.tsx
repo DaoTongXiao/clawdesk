@@ -13,6 +13,12 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, X, MessageSquare, ArrowRight } from "lucide-react";
 
+const SCROLL_TO_MESSAGE_EVENT = "chatclaw-scroll-to-message";
+
+interface ScrollToMessageEventDetail {
+  messageId: string;
+}
+
 interface SearchResult {
   message: Message;
   conversation: Conversation | undefined;
@@ -31,6 +37,17 @@ export function SearchDialog({ open, onOpenChange, initialScope = "global" }: Se
   const [loading, setLoading] = useState(false);
   const [scope, setScope] = useState<"global" | "current">(initialScope);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const emitScrollToMessage = useCallback((messageId: string) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.dispatchEvent(
+      new CustomEvent<ScrollToMessageEventDetail>(SCROLL_TO_MESSAGE_EVENT, {
+        detail: { messageId },
+      })
+    );
+  }, []);
 
   // Auto-focus input when dialog opens
   useEffect(() => {
@@ -77,8 +94,8 @@ export function SearchDialog({ open, onOpenChange, initialScope = "global" }: Se
       await actions.selectConversation(result.conversation.id);
     }
     onOpenChange(false);
-    // TODO: Scroll to specific message (can be enhanced later)
-  }, [state.activeConversationId, actions, onOpenChange]);
+    emitScrollToMessage(result.message.id);
+  }, [state.activeConversationId, actions, onOpenChange, emitScrollToMessage]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Escape") {

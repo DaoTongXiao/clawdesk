@@ -7,6 +7,12 @@ import { Bot, Sparkles, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
+const SCROLL_TO_MESSAGE_EVENT = "chatclaw-scroll-to-message";
+
+interface ScrollToMessageEventDetail {
+  messageId: string;
+}
+
 function EmptyState({ agentName }: { agentName: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-5 px-4">
@@ -45,10 +51,49 @@ function StreamingCursor() {
 export function ChatMessages() {
   const { state } = useStore();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollTargetMessageIdRef = useRef<string | null>(null);
+
+  const scrollToTargetMessage = () => {
+    const targetMessageId = scrollTargetMessageIdRef.current;
+    if (!targetMessageId) {
+      return false;
+    }
+    const targetElement = document.getElementById(`chat-message-${targetMessageId}`);
+    if (!targetElement) {
+      return false;
+    }
+    targetElement.scrollIntoView({ behavior: "smooth", block: "center" });
+    scrollTargetMessageIdRef.current = null;
+    return true;
+  };
 
   useEffect(() => {
+    if (scrollTargetMessageIdRef.current) {
+      return;
+    }
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [state.messages, state.streamingContent]);
+
+  useEffect(() => {
+    const handleScrollToMessage = (event: Event) => {
+      const customEvent = event as CustomEvent<ScrollToMessageEventDetail>;
+      const messageId = customEvent.detail?.messageId;
+      if (!messageId) {
+        return;
+      }
+      scrollTargetMessageIdRef.current = messageId;
+      scrollToTargetMessage();
+    };
+
+    window.addEventListener(SCROLL_TO_MESSAGE_EVENT, handleScrollToMessage);
+    return () => {
+      window.removeEventListener(SCROLL_TO_MESSAGE_EVENT, handleScrollToMessage);
+    };
+  }, []);
+
+  useEffect(() => {
+    scrollToTargetMessage();
+  }, [state.messages]);
 
   if (!state.activeConversationId) {
     return <EmptyState agentName={state.agentIdentity?.name ?? "ClawDesk"} />;
@@ -71,6 +116,7 @@ export function ChatMessages() {
           {state.messages.map((msg) => (
             <div
               key={msg.id}
+              id={`chat-message-${msg.id}`}
               className={cn("flex gap-4", msg.role === "user" && "flex-row-reverse")}
             >
               <Avatar
