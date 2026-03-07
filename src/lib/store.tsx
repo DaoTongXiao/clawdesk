@@ -24,6 +24,7 @@ import {
 } from "@/lib/db";
 import { getGateway, resetGateway } from "@/lib/gateway";
 import { detectGatewayFromDesktop } from "@/lib/desktop";
+import { buildConversationTitle, DEFAULT_CONVERSATION_TITLE } from "@/lib/conversation-title";
 import type {
   Settings,
   Conversation,
@@ -332,14 +333,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const current = stateRef.current;
     if (current.activeConversationId) {
       const activeConv = current.conversations.find(c => c.id === current.activeConversationId);
-      if (activeConv && activeConv.title === "New Chat" && current.messages.length === 0) {
+      if (activeConv && activeConv.title === DEFAULT_CONVERSATION_TITLE && current.messages.length === 0) {
         return current.activeConversationId;
       }
     }
 
     const id = uuidv4();
     const sessionKey = uuidv4();
-    const conv = await createConversation(id, sessionKey, "New Chat");
+    const conv = await createConversation(id, sessionKey, DEFAULT_CONVERSATION_TITLE);
     dispatch({ type: "ADD_CONVERSATION", conversation: conv });
     dispatch({ type: "SET_ACTIVE_CONVERSATION", id });
     dispatch({ type: "SET_MESSAGES", messages: [] });
@@ -401,9 +402,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     await addMessage(userMsg);
     dispatch({ type: "ADD_MESSAGE", message: userMsg });
 
-    // Auto-title from first message
-    if (conv.title === "New Chat") {
-      const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
+    if (conv.title === DEFAULT_CONVERSATION_TITLE) {
+      const title = buildConversationTitle(content);
       await updateConversationTitle(conv.id, title);
       dispatch({
         type: "UPDATE_CONVERSATION_TITLE",

@@ -1,6 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Conversation, Message, Settings } from "@/types";
 
+function toInvokeError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  if (typeof error === "string" && error.trim()) return new Error(error);
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return new Error(message);
+  }
+  return new Error("命令执行失败");
+}
+
 function ensureTheme(theme: "dark" | "light"): "dark" | "light" {
   return theme === "dark" ? "dark" : "light";
 }
@@ -16,11 +26,16 @@ export async function desktopSaveSettings(
   token: string,
   theme: "dark" | "light"
 ): Promise<Settings> {
-  const result = await invoke<Settings>("desktop_store_save_settings", {
-    gateway_url: gatewayUrl,
-    token,
-    theme,
-  });
+  let result: Settings;
+  try {
+    result = await invoke<Settings>("desktop_store_save_settings", {
+      gatewayUrl,
+      token,
+      theme,
+    });
+  } catch (error) {
+    throw toInvokeError(error);
+  }
   return { ...result, theme: ensureTheme(result.theme) };
 }
 
@@ -46,7 +61,7 @@ export async function desktopCreateConversation(
 ): Promise<Conversation> {
   return invoke<Conversation>("desktop_store_create_conversation", {
     id,
-    session_key: sessionKey,
+    sessionKey,
     title,
   });
 }
@@ -67,7 +82,7 @@ export async function desktopDeleteAllConversations(): Promise<void> {
 }
 
 export async function desktopGetMessages(conversationId: string): Promise<Message[]> {
-  return invoke<Message[]>("desktop_store_get_messages", { conversation_id: conversationId });
+  return invoke<Message[]>("desktop_store_get_messages", { conversationId });
 }
 
 export async function desktopAddMessage(message: Message): Promise<void> {
@@ -84,7 +99,7 @@ export async function desktopSearchMessages(
 ): Promise<Message[]> {
   return invoke<Message[]>("desktop_store_search_messages", {
     query,
-    conversation_id: conversationId ?? null,
+    conversationId: conversationId ?? null,
   });
 }
 

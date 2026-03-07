@@ -22,21 +22,25 @@ import { isDesktopRuntime } from "@/lib/desktop";
 import { Loader2, CheckCircle2, XCircle, Settings } from "lucide-react";
 
 type TestState = "idle" | "testing" | "success" | "error";
+type SaveState = "idle" | "saving" | "success" | "error";
 
 export function GatewaySettingsPanel() {
   const { state, actions } = useStore();
-  const [url, setUrl] = useState("");
-  const [token, setToken] = useState("");
+  const [url, setUrl] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [testState, setTestState] = useState<TestState>("idle");
   const [testError, setTestError] = useState("");
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveMessage, setSaveMessage] = useState("");
   const [updateState, setUpdateState] = useState<AppUpdateState>(getAppUpdateState());
   const [openclawUpdateState, setOpenclawUpdateState] = useState<OpenclawUpdateState>(getOpenclawUpdateState());
   const [manualUpdateLoading, setManualUpdateLoading] = useState(false);
   const [openclawUpdating, setOpenclawUpdating] = useState(false);
   const autoConnectOnceRef = useRef(false);
+  const connectNoticeArmedRef = useRef(false);
 
-  const gatewayUrl = url || state.settings?.gatewayUrl || state.detectedGatewayUrl || "";
-  const gatewayToken = token || state.settings?.token || state.detectedToken || "";
+  const gatewayUrl = url ?? state.settings?.gatewayUrl ?? state.detectedGatewayUrl ?? "";
+  const gatewayToken = token ?? state.settings?.token ?? state.detectedToken ?? "";
   const hasDetectedGateway = Boolean(state.detectedGatewayUrl && state.detectedToken);
 
   useEffect(() => {
@@ -67,6 +71,25 @@ export function GatewaySettingsPanel() {
     return subscribeOpenclawUpdate(setOpenclawUpdateState);
   }, []);
 
+  useEffect(() => {
+    if (saveState !== "success") return;
+    if (state.connectionStatus === "connecting") {
+      connectNoticeArmedRef.current = true;
+      return;
+    }
+    if (!connectNoticeArmedRef.current) return;
+    if (state.connectionStatus === "connected") {
+      setSaveMessage("配置已保存，连接成功");
+      connectNoticeArmedRef.current = false;
+      return;
+    }
+    if (state.connectionStatus === "error") {
+      setSaveState("error");
+      setSaveMessage("配置已保存，但连接失败，请检查地址或令牌");
+      connectNoticeArmedRef.current = false;
+    }
+  }, [saveState, state.connectionStatus]);
+
   const handleTest = async () => {
     if (!gatewayUrl || !gatewayToken) return;
     setTestState("testing");
@@ -82,7 +105,17 @@ export function GatewaySettingsPanel() {
 
   const handleSave = async () => {
     if (!gatewayUrl || !gatewayToken) return;
-    await actions.saveAndConnect(gatewayUrl, gatewayToken);
+    connectNoticeArmedRef.current = false;
+    setSaveState("saving");
+    setSaveMessage("");
+    try {
+      await actions.saveAndConnect(gatewayUrl, gatewayToken);
+      setSaveState("success");
+      setSaveMessage("配置已保存，正在尝试连接网关");
+    } catch (err) {
+      setSaveState("error");
+      setSaveMessage(err instanceof Error ? err.message : "保存失败，请稍后重试");
+    }
   };
 
   const handleUpdate = async () => {
@@ -161,6 +194,9 @@ export function GatewaySettingsPanel() {
             onChange={(e) => {
               setUrl(e.target.value);
               setTestState("idle");
+              connectNoticeArmedRef.current = false;
+              setSaveState("idle");
+              setSaveMessage("");
             }}
           />
         </div>
@@ -173,6 +209,9 @@ export function GatewaySettingsPanel() {
             onChange={(e) => {
               setToken(e.target.value);
               setTestState("idle");
+              connectNoticeArmedRef.current = false;
+              setSaveState("idle");
+              setSaveMessage("");
             }}
           />
         </div>
@@ -188,6 +227,9 @@ export function GatewaySettingsPanel() {
             连接成功
           </div>
         )}
+        {saveState === "saving" && <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />正在保存配置</div>}
+        {saveState === "success" && saveMessage && <div className="mt-4 flex items-center gap-2 text-sm text-emerald-500"><CheckCircle2 className="size-4" />{saveMessage}</div>}
+        {saveState === "error" && saveMessage && <div className="mt-4 flex items-center gap-2 text-sm text-red-400"><XCircle className="size-4" />{saveMessage}</div>}
         <div className="mt-4 flex justify-end gap-2">
           <Button
             variant="outline"
@@ -199,7 +241,8 @@ export function GatewaySettingsPanel() {
             )}
             测试连接
           </Button>
-          <Button onClick={handleSave} disabled={!gatewayUrl || !gatewayToken}>
+          <Button onClick={handleSave} disabled={!gatewayUrl || !gatewayToken || saveState === "saving"}>
+            {saveState === "saving" && <Loader2 className="mr-2 size-4 animate-spin" />}
             保存并连接
           </Button>
         </div>

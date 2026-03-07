@@ -177,7 +177,7 @@ export async function runOpenclawAction(
       section,
       action,
       target,
-      dry_run: dryRun,
+      dryRun,
     });
   } catch (error) {
     return toPayloadError(section, toErrorText(error));
